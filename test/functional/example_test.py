@@ -220,6 +220,39 @@ class ExampleTest(BitcoinTestFramework):
             for block in peer_receiving.block_receive_map.values():
                 assert_equal(block, 1)
 
+        self.nodes[1].disconnect_p2ps()
+        self.nodes[2].disconnect_p2ps()
+        self.disconnect_nodes(1, 2)
+
+        # Create P2P connections will wait for a verack to make sure the connection is fully up
+        peer_messaging = self.nodes[0].add_p2p_connection(BaseNode())
+
+        block = create_block(self.tip, create_coinbase(height+1), self.block_time)
+        block.solve()
+        block_message = msg_block(block)
+        # Send message is used to send a P2P message to the node over our P2PInterface
+        peer_messaging.send_message(block_message)
+        self.tip = block.sha256
+        self.block_time += 1
+        height += 1
+
+        self.log.info("Wait for node1 to reach current tip (height) using RPC")
+        self.nodes[1].waitforblockheight(12)
+
+        self.log.info(f"Blocks in node 1 = {self.nodes[1].getblockcount()}")
+        self.log.info(f"Blocks in node 2 = {self.nodes[2].getblockcount()}")
+
+        self.log.info("Connect node2 and node1")
+        self.connect_nodes(1, 2)
+
+        self.log.info("Wait for node2 to receive all the blocks from node1")
+        self.sync_all()
+
+        self.log.info(f"Blocks in node 1 = {self.nodes[1].getblockcount()}")
+        self.log.info(f"Blocks in node 2 = {self.nodes[2].getblockcount()}")
+
+        assert_equal(self.nodes[1].getblockcount(), self.nodes[2].getblockcount())
+
 
 if __name__ == '__main__':
     ExampleTest().main()
